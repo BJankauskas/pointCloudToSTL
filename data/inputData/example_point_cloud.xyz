@@ -1,0 +1,10 @@
+# Example point cloud data for a cube with 8 points
+# X Y Z
+0 0 0
+0 0 1
+0 1 0
+0 1 1
+1 0 0
+1 0 1
+1 1 0
+1 1 1

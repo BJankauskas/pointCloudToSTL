@@ -1,0 +1,5 @@
+open3d
+numpy-stl
+scipy
+matplotlib
+trimesh
