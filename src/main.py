@@ -4,7 +4,7 @@ import numpy as np
 import logging
 import signal
 from point_cloud_processing import load_point_cloud, estimate_normals 
-from surface_reconstruction import delaunay_surface_reconstruction, poisson_surface_reconstruction, extract_outer_surface, marching_cubes_surface_reconstruction
+from surface_reconstruction import delaunay_surface_reconstruction, poisson_surface_reconstruction, extract_outer_surface, marching_cubes_surface_reconstruction, ball_pivoting_surface_reconstruction
 from stl_exporter import save_mesh_as_stl
 from utils import check_and_correct_face_normals, check_normals, visualize_normals
 
@@ -24,8 +24,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, or marching_cubes.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting"], default="delaunay",
+                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, or ball_pivoting.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
@@ -33,7 +33,8 @@ def get_parser():
     parser.add_argument("--density_percentile", type=int, default=30,
                         help="Density percentile for Poisson surface reconstruction. Only applicable if algorithm is 'poisson'.")
     parser.add_argument("--voxel_level", type=float, default=0.05,
-                        help="Voxel resolution for Marching Cubes surface reconstruction. Only applicable if algorithm is 'marching_cubes'.")
+                        help="Voxel resolution for Marching Cubes and Ball Pivoting surface reconstruction. " \
+                        "Only applicable if algorithm is 'marching_cubes' and 'ball-pivoting'.")
     parser.add_argument("--output_stl_path", type=str, default="./data/outputs/mesh_output.stl",
                         help="Path to save the reconstructed mesh as STL.")
     return parser
@@ -122,6 +123,10 @@ def main():
             volume_data = gaussian_filter(volume_data, sigma=1)
 
             mesh = marching_cubes_surface_reconstruction(volume_data, voxel_size)
+        elif args.algorithm == "ball_pivoting":
+            logging.info("Performing Ball Pivoting surface reconstruction...")
+            radius = args.voxel_level  # Use voxel_level as the radius for Ball Pivoting
+            mesh = ball_pivoting_surface_reconstruction(point_cloud, radius)
 
         if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
             logging.warning("Warning: Reconstructed mesh is empty. Skipping STL export.")
