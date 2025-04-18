@@ -4,7 +4,6 @@ __pycache__/
 
 # Output files
 data/debug_outputs/
-data/outputs/
 
 # Environment files
 .env
