@@ -4,7 +4,7 @@ import numpy as np
 import logging
 import signal
 from point_cloud_processing import load_point_cloud, estimate_normals 
-from surface_reconstruction import delaunay_surface_reconstruction, poisson_surface_reconstruction, extract_outer_surface, marching_cubes_surface_reconstruction, ball_pivoting_surface_reconstruction
+from surface_reconstruction import *
 from stl_exporter import save_mesh_as_stl
 from utils import check_and_correct_face_normals, check_normals, visualize_normals
 
@@ -24,8 +24,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, or ball_pivoting.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes"], default="delaunay",
+                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, or alpha_shapes.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
@@ -127,6 +127,10 @@ def main():
             logging.info("Performing Ball Pivoting surface reconstruction...")
             radius = args.voxel_level  # Use voxel_level as the radius for Ball Pivoting
             mesh = ball_pivoting_surface_reconstruction(point_cloud, radius)
+        elif args.algorithm == "alpha_shapes":
+            logging.info("Performing Alpha Shapes surface reconstruction...")
+            alpha = args.voxel_level  # Use voxel_level as the alpha parameter
+            mesh = alpha_shapes_surface_reconstruction(point_cloud, alpha)
 
         if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
             logging.warning("Warning: Reconstructed mesh is empty. Skipping STL export.")
