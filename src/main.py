@@ -11,7 +11,7 @@ from utils import check_and_correct_face_normals, check_normals, visualize_norma
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(message)s',
     datefmt='%H:%M:%S'
 )
 
@@ -24,19 +24,35 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, or alpha_shapes.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf"], default="delaunay",
+                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, or rbf.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
-                        help="Depth for Poisson surface reconstruction. Only applicable if algorithm is 'poisson'.")
+                        help="Depth for Poisson surface reconstruction. " \
+                        "Only applicable if algorithm is 'poisson'.")
     parser.add_argument("--density_percentile", type=int, default=30,
-                        help="Density percentile for Poisson surface reconstruction. Only applicable if algorithm is 'poisson'.")
+                        help="Density percentile for Poisson surface reconstruction. " \
+                        "Only applicable if algorithm is 'poisson'.")
     parser.add_argument("--voxel_level", type=float, default=0.05,
                         help="Voxel resolution for Marching Cubes and Ball Pivoting surface reconstruction. " \
                         "Only applicable if algorithm is 'marching_cubes' and 'ball-pivoting'.")
     parser.add_argument("--output_stl_path", type=str, default="./data/outputs/mesh_output.stl",
                         help="Path to save the reconstructed mesh as STL.")
+    parser.add_argument("--rbf_function", type=str, default="multiquadric",
+                        help="RBF function to use for RBF surface reconstruction. " \
+                        "Options: 'linear', 'cubic', 'quintic', 'thin_plate', 'multiquadric', 'inverse_multiquadric'. " \
+                        "Only applicable if algorithm is 'rbf'.")
+    parser.add_argument("--rbf_smooth", type=float, default=0.0,
+                        help="Smoothing parameter for RBF surface reconstruction. " \
+                        "Only applicable if algorithm is 'rbf'.")
+    parser.add_argument(
+        "--max-cores",
+        type=int,
+        default=1,
+        help="Maximum number of CPU cores to use for parallel processing (default: use all available cores minus one). " \
+             "Set to 1 to disable parallel processing."
+    )
     return parser
 
 def timeout_handler(signum, frame):
@@ -131,6 +147,19 @@ def main():
             logging.info("Performing Alpha Shapes surface reconstruction...")
             alpha = args.voxel_level  # Use voxel_level as the alpha parameter
             mesh = alpha_shapes_surface_reconstruction(point_cloud, alpha)
+        elif args.algorithm == "rbf":
+            logging.info("Performing RBF surface reconstruction...")
+            max_cores = args.max_cores
+            if max_cores == 1:
+                logging.info("Parallel processing disabled (max_cores=1).")
+            mesh = rbf_surface_reconstruction(
+                point_cloud,
+                function=args.rbf_function,
+                smooth=args.rbf_smooth,
+                max_cores=max_cores
+            )
+            o3d.io.write_triangle_mesh(output_file, mesh)
+            logging.info(f"RBF reconstruction completed. Mesh saved to {output_file}.")
 
         if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
             logging.warning("Warning: Reconstructed mesh is empty. Skipping STL export.")
