@@ -8,6 +8,7 @@ from src.reconstruction_algorithms.alpha_shapes import alpha_shapes_surface_reco
 from src.reconstruction_algorithms.rbf import rbf_surface_reconstruction
 from src.reconstruction_algorithms.voronoi import voronoi_surface_reconstruction
 from src.reconstruction_algorithms.convex_hull import extract_outer_surface
+from src.reconstruction_algorithms.moving_least_squares import moving_least_squares_surface_reconstruction
 
 DEBUG = True  # Set to True to enable debug output
 

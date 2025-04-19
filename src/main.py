@@ -24,8 +24,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, rbf, or voronoi.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"], default="delaunay",
+                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, rbf, voronoi, or mls.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
@@ -163,13 +163,34 @@ def main():
         elif args.algorithm == "voronoi":
             logging.info("Performing Voronoi-based surface reconstruction...")
             mesh = voronoi_surface_reconstruction(point_cloud)
+        elif args.algorithm == "mls":
+            logging.info("Performing Moving Least Squares (MLS) surface reconstruction...")
+            search_radius = args.voxel_level  # Use voxel_level as the search radius
+            smoothed_point_cloud = moving_least_squares_surface_reconstruction(point_cloud, search_radius)
 
-        if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
-            logging.warning("Warning: Reconstructed mesh is empty. Skipping STL export.")
-        else:
-            check_and_correct_face_normals(mesh)
-            logging.info("Saving mesh as STL...")
-            save_mesh_as_stl(mesh, output_file)
+            # Convert the smoothed point cloud to a mesh using Alpha Shapes
+            alpha = search_radius
+            try:
+                mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(
+                    smoothed_point_cloud, alpha
+                )
+                mesh.compute_vertex_normals()
+            except RuntimeError as e:
+                logging.warning(f"Alpha Shape reconstruction failed with alpha={alpha}: {e}")
+                logging.info("Attempting reconstruction with a smaller alpha value...")
+                alpha /= 2  # Reduce alpha and retry
+                mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(
+                    smoothed_point_cloud, alpha
+                )
+                mesh.compute_vertex_normals()
+
+            if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
+                logging.warning("Warning: Reconstructed mesh is empty. Visualizing smoothed point cloud instead.")
+                o3d.visualization.draw_geometries([smoothed_point_cloud])
+            else:
+                check_and_correct_face_normals(mesh)
+                logging.info("Saving mesh as STL...")
+                save_mesh_as_stl(mesh, output_file)
 
         logging.info("Surface reconstruction completed.")
     except Exception as e:
