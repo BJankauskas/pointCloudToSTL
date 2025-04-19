@@ -17,7 +17,7 @@
 - **Alpha Shapes**: Captures concave shapes and provides control over detail through the `alpha` parameter.
 - **Screened Poisson Reconstruction**: An improved version of Poisson reconstruction that better preserves sharp features.
 - **RBF (Radial Basis Function) Interpolation**: Handles scattered and sparse data to produce smooth surfaces.
-- **Voronoi-Based Reconstruction**: Constructs surfaces using Voronoi diagrams, suitable for irregularly sampled data.
+- **Voronoi-Based Reconstruction**: Constructs surfaces using Voronoi diagrams, suitable for irregularly sampled data. This method computes the Voronoi diagram of the input point cloud and uses valid triangular ridges to form a mesh. It is particularly effective for irregularly distributed points.
 - **MLS (Moving Least Squares)**: Fits smooth surfaces to noisy data with adjustable detail.
 
 ## AI/ML Features for Surface Reconstruction

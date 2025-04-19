@@ -24,8 +24,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, or rbf.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi"], default="delaunay",
+                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, rbf, or voronoi.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
@@ -160,6 +160,9 @@ def main():
             )
             o3d.io.write_triangle_mesh(output_file, mesh)
             logging.info(f"RBF reconstruction completed. Mesh saved to {output_file}.")
+        elif args.algorithm == "voronoi":
+            logging.info("Performing Voronoi-based surface reconstruction...")
+            mesh = voronoi_surface_reconstruction(point_cloud)
 
         if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
             logging.warning("Warning: Reconstructed mesh is empty. Skipping STL export.")
