@@ -49,8 +49,8 @@ To improve the quality of surface reconstruction and reduce artifacts, the follo
 These enhancements will ensure cleaner and more accurate surface reconstruction results.
 
 ## Performance Optimization
-- Optimize algorithms for large point clouds to reduce memory usage and computation time.
-- Leverage GPU acceleration for computationally intensive tasks.
+- Optimize algorithms for large point clouds to reduce memory usage and computation time. **DONE**
+- Leverage GPU acceleration for computationally intensive tasks. **CUDA currently not supported by Open3D**
 
 ## Deployment
 - Package the application using Docker for easy deployment.

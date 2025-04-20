@@ -29,11 +29,23 @@ def get_parser():
     """
     Create and return the argument parser for the script.
     """
-    parser = argparse.ArgumentParser(description="Surface Reconstruction")
+    parser = argparse.ArgumentParser(
+        description="Surface Reconstruction Tool",
+        epilog="""
+        This script performs surface reconstruction from point cloud data using various algorithms.
+        It supports preprocessing (denoising, smoothing, resampling) and postprocessing (hole filling,
+        mesh simplification, and smoothing). Users can configure parameters via CLI flags or an interactive menu.
+        """
+    )
+    parser.add_argument("--cli-menu", action="store_true",
+                        help="Trigger the interactive CLI menu for configuration.")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
-    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"], default="delaunay",
-                        help="Reconstruction algorithm to use: delaunay, poisson, convex_hull, marching_cubes, ball_pivoting, alpha_shapes, rbf, voronoi, or mls.")
+    parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "ball_pivoting", "marching_cubes", "alpha_shapes", "rbf", "voronoi", "mls"], default="poisson",
+                        help="Reconstruction algorithm to use: " \
+                        "Recommended default: poisson," \
+                        "Other working algorithms: delaunay, convex_hull, ball_pivoting, " \
+                        "Need further testing: marching_cubes, alpha_shapes, rbf, voronoi, or mls.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
@@ -191,10 +203,12 @@ def optimize_for_large_point_clouds(point_cloud, voxel_size=0.1):
     return optimized_point_cloud
 
 def main():
-    # Add a flag to choose between CLI menu or command-line arguments
-    use_cli_menu = input("Use CLI menu for configuration? (True/False): ").strip().lower() in ["true", "1", "yes"]
+    # Parse command-line arguments
+    parser = get_parser()
+    args = parser.parse_args()
 
-    if use_cli_menu:
+    # Check if the CLI menu should be triggered
+    if args.cli_menu:
         # Display CLI menu
         user_config = cli_menu()
 
@@ -210,9 +224,6 @@ def main():
             return
     else:
         # Use command-line arguments
-        parser = get_parser()
-        args = parser.parse_args()
-
         # Validate the algorithm
         try:
             validate_algorithm(args.algorithm)
