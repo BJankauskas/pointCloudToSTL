@@ -42,9 +42,9 @@ def get_parser():
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
     parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "ball_pivoting", "marching_cubes", "alpha_shapes", "rbf", "voronoi", "mls"], default="poisson",
-                        help="Reconstruction algorithm to use: " \
-                        "Recommended default: poisson," \
-                        "Other working algorithms: delaunay, convex_hull, ball_pivoting, " \
+                        help="Reconstruction algorithm to use: \n" \
+                        "Recommended default: poisson \n" \
+                        "Other working algorithms: delaunay, convex_hull, ball_pivoting \n" \
                         "Need further testing: marching_cubes, alpha_shapes, rbf, voronoi, or mls.")
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
