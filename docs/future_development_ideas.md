@@ -35,11 +35,13 @@
 To improve the quality of surface reconstruction and reduce artifacts, the following preprocessing and postprocessing methods should be implemented:
 
 ## Preprocessing Methods
+**DONE**
 1. **Point Cloud Denoising**: Implement algorithms to remove noise and outliers from the point cloud data.
 2. **Point Cloud Smoothing**: Apply smoothing techniques to reduce sharp transitions and irregularities in the point cloud.
 3. **Point Cloud Resampling**: Add functionality to densify or uniformly sample the point cloud for consistent coverage.
 
 ### Postprocessing Methods
+**DONE**
 1. **Mesh Smoothing**: Introduce mesh smoothing algorithms to remove jagged edges and surface artifacts.
 2. **Hole Filling**: Implement hole-filling techniques to close small gaps in the reconstructed mesh.
 3. **Mesh Simplification**: Add methods to simplify the mesh while preserving its overall shape and structure.

@@ -139,3 +139,16 @@ def check_and_correct_face_normals(mesh):
     mesh.compute_triangle_normals()
     if DEBUG:
         print("Face normals have been checked and corrected.")
+
+def is_gpu_available():
+    """
+    Check if GPU acceleration is available for Open3D.
+
+    Returns:
+        bool: True if GPU is available, False otherwise.
+    """
+    try:
+        import open3d.cuda.pybind as o3d_cuda
+        return True
+    except ImportError:
+        return False

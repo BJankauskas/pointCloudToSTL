@@ -30,8 +30,6 @@ def get_parser():
     Create and return the argument parser for the script.
     """
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
-    parser.add_argument("--cli-menu", type=bool, default="False",
-                        help="Path to the input point cloud file.")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
     parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"], default="delaunay",
@@ -171,6 +169,27 @@ def cli_menu():
         "density_percentile": density_percentile,
     }
 
+def optimize_for_large_point_clouds(point_cloud, voxel_size=0.1):
+    """
+    Optimize the point cloud for large datasets by downsampling.
+
+    Parameters:
+        point_cloud (o3d.geometry.PointCloud): The input point cloud.
+        voxel_size (float): The voxel size for downsampling.
+
+    Returns:
+        o3d.geometry.PointCloud: The optimized point cloud.
+    """
+    logging.info("Optimizing point cloud for large datasets...")
+    # Downsample the point cloud to reduce memory usage
+    optimized_point_cloud = point_cloud.voxel_down_sample(voxel_size=voxel_size)
+    logging.info(f"Point cloud downsampled to {len(optimized_point_cloud.points)} points.")
+
+    # Placeholder for future GPU acceleration support
+    logging.info("GPU acceleration is not currently supported in Open3D. Using CPU for processing.")
+
+    return optimized_point_cloud
+
 def main():
     # Add a flag to choose between CLI menu or command-line arguments
     use_cli_menu = input("Use CLI menu for configuration? (True/False): ").strip().lower() in ["true", "1", "yes"]
@@ -229,8 +248,12 @@ def main():
     try:
         logging.info("Loading point cloud...")
         point_cloud = load_point_cloud(input_file)
+
+        # Optimize for large point clouds
+        point_cloud = optimize_for_large_point_clouds(point_cloud, voxel_size=user_config["voxel_level"] * 2)
+
     except Exception as e:
-        logging.error(f"Error loading point cloud: {e}")
+        logging.error(f"Error loading or optimizing point cloud: {e}")
         return
 
     try:
