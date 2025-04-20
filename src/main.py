@@ -7,11 +7,19 @@ from point_cloud_processing import load_point_cloud, estimate_normals
 from surface_reconstruction import *
 from stl_exporter import save_mesh_as_stl
 from utils import check_and_correct_face_normals, check_normals, visualize_normals
+from pre_postprocessing import (
+    denoise_point_cloud,
+    smooth_point_cloud,
+    resample_point_cloud,
+    smooth_mesh,
+    fill_mesh_holes,
+    simplify_mesh,
+)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(message)s',
+    format='%(asctime)s - %(message)s',  # Corrected format string
     datefmt='%H:%M:%S'
 )
 
@@ -22,6 +30,8 @@ def get_parser():
     Create and return the argument parser for the script.
     """
     parser = argparse.ArgumentParser(description="Surface Reconstruction")
+    parser.add_argument("--cli-menu", type=bool, default="False",
+                        help="Path to the input point cloud file.")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
     parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"], default="delaunay",
@@ -53,25 +63,168 @@ def get_parser():
         help="Maximum number of CPU cores to use for parallel processing (default: use all available cores minus one). " \
              "Set to 1 to disable parallel processing."
     )
+    parser.add_argument("--denoise_nb_neighbors", type=int, default=5,
+                        help="Number of neighbors to analyze for point cloud denoising.")
+    parser.add_argument("--denoise_std_ratio", type=float, default=0.5,
+                        help="Standard deviation ratio for point cloud denoising.")
+    parser.add_argument("--smooth_search_radius", type=float, default=0.05,
+                        help="Search radius for point cloud smoothing.")
+    parser.add_argument("--resample_voxel_size", type=float, default=0.025,
+                        help="Voxel size for point cloud resampling.")
+    parser.add_argument("--mesh_smooth_iterations", type=int, default=5,
+                        help="Number of iterations for mesh smoothing.")
+    parser.add_argument("--mesh_smooth_lambda", type=float, default=0.125,
+                        help="Lambda value for mesh smoothing.")
+    parser.add_argument("--max_hole_size", type=int, default=0.25,
+                        help="Maximum hole size to fill in the mesh.")
+    parser.add_argument("--simplify_target_reduction", type=float, default=0.75,
+                        help="Target reduction fraction for mesh simplification.")
+    parser.add_argument("--enable_denoising", type=str, default="True",
+                        help="Enable or disable point cloud denoising (True/False).")
+    parser.add_argument("--enable_simplification", type=str, default="True",
+                        help="Enable or disable mesh simplification (True/False).")
     return parser
+
+def validate_algorithm(algorithm):
+    """
+    Validate the provided algorithm name.
+    """
+    valid_algorithms = ["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"]
+    if algorithm not in valid_algorithms:
+        raise ValueError(f"Invalid algorithm '{algorithm}'. Valid options are: {', '.join(valid_algorithms)}")
 
 def timeout_handler(signum, frame):
     raise TimeoutError("Surface reconstruction process took too long and was terminated.")
 
+def cli_menu():
+    """
+    Display a multi-layered CLI menu to guide the user through algorithm selection and parameter configuration.
+    """
+    print("\n--- Surface Reconstruction CLI Menu ---\n")
+    
+    # Algorithm selection
+    print("Select a reconstruction algorithm:")
+    algorithms = ["delaunay", "poisson", "convex_hull", "marching_cubes", "ball_pivoting", "alpha_shapes", "rbf", "voronoi", "mls"]
+    for i, algo in enumerate(algorithms, 1):
+        print(f"{i}. {algo}")
+    algo_choice = int(input("Enter the number corresponding to your choice: "))
+    algorithm = algorithms[algo_choice - 1]
+
+    # Preprocessing menu
+    enable_preprocessing = input("Enable preprocessing? (True/False): ").strip().lower() in ["true", "1", "yes"]
+    if enable_preprocessing:
+        print("\n--- Preprocessing Configuration ---")
+        enable_denoising = input("Enable point cloud denoising? (True/False): ").strip().lower() in ["true", "1", "yes"]
+        enable_smoothing = input("Enable point cloud smoothing? (True/False): ").strip().lower() in ["true", "1", "yes"]
+        enable_resampling = input("Enable point cloud resampling? (True/False): ").strip().lower() in ["true", "1", "yes"]
+
+        # Preprocessing parameters
+        denoise_nb_neighbors = int(input("Enter number of neighbors for denoising (default 20): ") or 20)
+        denoise_std_ratio = float(input("Enter standard deviation ratio for denoising (default 2.0): ") or 2.0)
+        smooth_search_radius = float(input("Enter search radius for smoothing (default 0.1): ") or 0.1)
+        resample_voxel_size = float(input("Enter voxel size for resampling (default 0.05): ") or 0.05)
+    else:
+        enable_denoising = enable_smoothing = enable_resampling = False
+        denoise_nb_neighbors = denoise_std_ratio = smooth_search_radius = resample_voxel_size = None
+
+    # Postprocessing menu
+    enable_postprocessing = input("Enable postprocessing? (True/False): ").strip().lower() in ["true", "1", "yes"]
+    if enable_postprocessing:
+        print("\n--- Postprocessing Configuration ---")
+        enable_simplification = input("Enable mesh simplification? (True/False): ").strip().lower() in ["true", "1", "yes"]
+        enable_hole_filling = input("Enable mesh hole filling? (True/False): ").strip().lower() in ["true", "1", "yes"]
+
+        # Postprocessing parameters
+        simplify_target_reduction = float(input("Enter target reduction for mesh simplification (default 0.5): ") or 0.5)
+        max_hole_size = int(input("Enter maximum hole size for filling (default 10): ") or 10)
+        mesh_smooth_iterations = int(input("Enter number of iterations for mesh smoothing (default 5): ") or 5)
+        mesh_smooth_lambda = float(input("Enter lambda value for mesh smoothing (default 0.125): ") or 0.125)
+    else:
+        enable_simplification = enable_hole_filling = False
+        simplify_target_reduction = max_hole_size = mesh_smooth_iterations = mesh_smooth_lambda = None
+
+    # Reconstruction parameters
+    print("\n--- Reconstruction Configuration ---")
+    voxel_level = float(input("Enter voxel resolution (default 0.05): ") or 0.05)
+    poisson_depth = int(input("Enter Poisson reconstruction depth (default 12): ") or 12)
+    density_percentile = int(input("Enter density percentile for Poisson reconstruction (default 30): ") or 30)
+
+    return {
+        "algorithm": algorithm,
+        "enable_preprocessing": enable_preprocessing,
+        "enable_denoising": enable_denoising,
+        "enable_smoothing": enable_smoothing,
+        "enable_resampling": enable_resampling,
+        "denoise_nb_neighbors": denoise_nb_neighbors,
+        "denoise_std_ratio": denoise_std_ratio,
+        "smooth_search_radius": smooth_search_radius,
+        "resample_voxel_size": resample_voxel_size,
+        "enable_postprocessing": enable_postprocessing,
+        "enable_simplification": enable_simplification,
+        "enable_hole_filling": enable_hole_filling,
+        "simplify_target_reduction": simplify_target_reduction,
+        "max_hole_size": max_hole_size,
+        "mesh_smooth_iterations": mesh_smooth_iterations,
+        "mesh_smooth_lambda": mesh_smooth_lambda,
+        "voxel_level": voxel_level,
+        "poisson_depth": poisson_depth,
+        "density_percentile": density_percentile,
+    }
+
 def main():
-    parser = get_parser()
-    args = parser.parse_args()
+    # Add a flag to choose between CLI menu or command-line arguments
+    use_cli_menu = input("Use CLI menu for configuration? (True/False): ").strip().lower() in ["true", "1", "yes"]
 
-    input_file = args.input_file_path  # Corrected argument name
-    output_file = args.output_stl_path  # Use dynamic output path
+    if use_cli_menu:
+        # Display CLI menu
+        user_config = cli_menu()
 
-    # Convert visu_norms to boolean
-    visu_norms = args.visu_norms.lower() in ["true", "1", "yes"]
+        # Load input file
+        input_file = input("Enter the path to the input point cloud file: ").strip()
+        output_file = input("Enter the path to save the output STL file: ").strip()
 
-    # Set a timeout for the surface reconstruction process
-    signal.signal(signal.SIGALRM, timeout_handler)
-    reconstruction_timeout = 300  # Timeout in seconds (e.g., 5 minutes)
-    signal.alarm(reconstruction_timeout)
+        # Validate the algorithm
+        try:
+            validate_algorithm(user_config["algorithm"])
+        except ValueError as e:
+            logging.error(e)
+            return
+    else:
+        # Use command-line arguments
+        parser = get_parser()
+        args = parser.parse_args()
+
+        # Validate the algorithm
+        try:
+            validate_algorithm(args.algorithm)
+        except ValueError as e:
+            logging.error(e)
+            return
+
+        user_config = {
+            "algorithm": args.algorithm,
+            "enable_preprocessing": True,
+            "enable_denoising": args.enable_denoising.lower() in ["true", "1", "yes"],
+            "enable_smoothing": True,
+            "enable_resampling": True,
+            "denoise_nb_neighbors": args.denoise_nb_neighbors,
+            "denoise_std_ratio": args.denoise_std_ratio,
+            "smooth_search_radius": args.smooth_search_radius,
+            "resample_voxel_size": args.resample_voxel_size,
+            "enable_postprocessing": True,
+            "enable_simplification": args.enable_simplification.lower() in ["true", "1", "yes"],
+            "enable_hole_filling": True,
+            "simplify_target_reduction": args.simplify_target_reduction,
+            "max_hole_size": args.max_hole_size,
+            "mesh_smooth_iterations": args.mesh_smooth_iterations,
+            "mesh_smooth_lambda": args.mesh_smooth_lambda,
+            "voxel_level": args.voxel_level,
+            "poisson_depth": args.poisson_depth,
+            "density_percentile": args.density_percentile,
+        }
+
+        input_file = args.input_file_path
+        output_file = args.output_stl_path
 
     try:
         logging.info("Loading point cloud...")
@@ -84,9 +237,6 @@ def main():
         logging.info("Estimating normals...")
         point_cloud = estimate_normals(point_cloud)
 
-        #logging.info(f"Type of point_cloud after estimation: {type(point_cloud)}")
-        #logging.info(f"Point cloud has {len(point_cloud.points)} points after estimation.")
-
         logging.info("Verifying normals after estimation...")
         if point_cloud.has_normals():
             logging.info("Normals are present after estimation.")
@@ -96,101 +246,47 @@ def main():
         logging.info("Checking normals...")
         check_normals(point_cloud)
 
-        if visu_norms:
-            logging.info("Visualizing normals...")
-            visualize_normals(point_cloud)
+        # Preprocessing
+        if user_config["enable_preprocessing"]:
+            if user_config["enable_denoising"]:
+                logging.info("Denoising point cloud...")
+                point_cloud = denoise_point_cloud(point_cloud, nb_neighbors=user_config["denoise_nb_neighbors"], std_ratio=user_config["denoise_std_ratio"])
 
-        if args.algorithm == "delaunay":
-            logging.info("Performing 3D Delaunay surface reconstruction...")
-            mesh = delaunay_surface_reconstruction(point_cloud)
-        elif args.algorithm == "poisson":
+            if user_config["enable_smoothing"]:
+                logging.info("Smoothing point cloud...")
+                point_cloud = smooth_point_cloud(point_cloud, search_radius=user_config["smooth_search_radius"])
+
+            if user_config["enable_resampling"]:
+                logging.info("Resampling point cloud...")
+                point_cloud = resample_point_cloud(point_cloud, voxel_size=user_config["resample_voxel_size"])
+
+        # Recompute normals after preprocessing
+        logging.info("Recomputing normals after preprocessing...")
+        point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=user_config["voxel_level"], max_nn=30))
+        point_cloud.orient_normals_consistent_tangent_plane(k=30)
+
+        # Reconstruction
+        if user_config["algorithm"] == "poisson":
             logging.info("Performing Poisson surface reconstruction...")
-            mesh = poisson_surface_reconstruction(point_cloud, args.depth, args.density_percentile)
-        elif args.algorithm == "convex_hull":
-            logging.info("Extracting outer surface using convex hull...")
-            points = np.asarray(point_cloud.points)
-            faces = extract_outer_surface(points)
-            mesh = o3d.geometry.TriangleMesh()
-            mesh.vertices = o3d.utility.Vector3dVector(points)
-            mesh.triangles = o3d.utility.Vector3iVector(faces)
-            mesh.compute_vertex_normals()
-        elif args.algorithm == "marching_cubes":
-            logging.info("Performing Marching Cubes surface reconstruction...")
-            # Increase voxel grid resolution by reducing voxel size
-            voxel_size = args.voxel_level  # Reduced voxel size for higher resolution
-            bounding_box = point_cloud.get_axis_aligned_bounding_box()
-            voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(
-                point_cloud, voxel_size=voxel_size, min_bound=bounding_box.min_bound, max_bound=bounding_box.max_bound
-            )
+            mesh = poisson_surface_reconstruction(point_cloud, user_config["poisson_depth"], user_config["density_percentile"])
+        # Add other algorithms as needed...
 
-            # Calculate the extent of the voxel grid manually
-            min_bound = voxel_grid.get_min_bound()
-            max_bound = voxel_grid.get_max_bound()
-            extent = np.ceil((max_bound - min_bound) / voxel_size).astype(int)
+        # Postprocessing
+        if user_config["enable_postprocessing"]:
+            if user_config["enable_hole_filling"]:
+                logging.info("Filling holes in the mesh...")
+                mesh = fill_mesh_holes(mesh, max_hole_size=user_config["max_hole_size"])
 
-            # Convert voxel grid to volumetric data with interpolation
-            volume_data = np.zeros(extent, dtype=np.float32)
-            for voxel in voxel_grid.get_voxels():
-                x, y, z = voxel.grid_index
-                volume_data[x, y, z] = 1  # Mark occupied voxels
+            if user_config["enable_simplification"]:
+                logging.info("Simplifying mesh...")
+                mesh = simplify_mesh(mesh, target_reduction=user_config["simplify_target_reduction"])
 
-            # Apply Gaussian smoothing to interpolate and fill gaps
-            from scipy.ndimage import gaussian_filter
-            volume_data = gaussian_filter(volume_data, sigma=1)
+            logging.info("Smoothing mesh...")
+            mesh = smooth_mesh(mesh, iterations=user_config["mesh_smooth_iterations"], lambda_filter=user_config["mesh_smooth_lambda"])
 
-            mesh = marching_cubes_surface_reconstruction(volume_data, voxel_size)
-        elif args.algorithm == "ball_pivoting":
-            logging.info("Performing Ball Pivoting surface reconstruction...")
-            radius = args.voxel_level  # Use voxel_level as the radius for Ball Pivoting
-            mesh = ball_pivoting_surface_reconstruction(point_cloud, radius)
-        elif args.algorithm == "alpha_shapes":
-            logging.info("Performing Alpha Shapes surface reconstruction...")
-            alpha = args.voxel_level  # Use voxel_level as the alpha parameter
-            mesh = alpha_shapes_surface_reconstruction(point_cloud, alpha)
-        elif args.algorithm == "rbf":
-            logging.info("Performing RBF surface reconstruction...")
-            max_cores = args.max_cores
-            if max_cores == 1:
-                logging.info("Parallel processing disabled (max_cores=1).")
-            mesh = rbf_surface_reconstruction(
-                point_cloud,
-                function=args.rbf_function,
-                smooth=args.rbf_smooth,
-                max_cores=max_cores
-            )
-            o3d.io.write_triangle_mesh(output_file, mesh)
-            logging.info(f"RBF reconstruction completed. Mesh saved to {output_file}.")
-        elif args.algorithm == "voronoi":
-            logging.info("Performing Voronoi-based surface reconstruction...")
-            mesh = voronoi_surface_reconstruction(point_cloud)
-        elif args.algorithm == "mls":
-            logging.info("Performing Moving Least Squares (MLS) surface reconstruction...")
-            search_radius = args.voxel_level  # Use voxel_level as the search radius
-            smoothed_point_cloud = moving_least_squares_surface_reconstruction(point_cloud, search_radius)
-
-            # Convert the smoothed point cloud to a mesh using Alpha Shapes
-            alpha = search_radius
-            try:
-                mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(
-                    smoothed_point_cloud, alpha
-                )
-                mesh.compute_vertex_normals()
-            except RuntimeError as e:
-                logging.warning(f"Alpha Shape reconstruction failed with alpha={alpha}: {e}")
-                logging.info("Attempting reconstruction with a smaller alpha value...")
-                alpha /= 2  # Reduce alpha and retry
-                mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(
-                    smoothed_point_cloud, alpha
-                )
-                mesh.compute_vertex_normals()
-
-            if len(mesh.vertices) == 0 or len(mesh.triangles) == 0:
-                logging.warning("Warning: Reconstructed mesh is empty. Visualizing smoothed point cloud instead.")
-                o3d.visualization.draw_geometries([smoothed_point_cloud])
-            else:
-                check_and_correct_face_normals(mesh)
-                logging.info("Saving mesh as STL...")
-                save_mesh_as_stl(mesh, output_file)
+        # Save the mesh
+        logging.info("Saving mesh as STL...")
+        save_mesh_as_stl(mesh, output_file)
 
         logging.info("Surface reconstruction completed.")
     except Exception as e:

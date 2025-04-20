@@ -12,13 +12,13 @@
 - Provide real-time progress updates for long-running operations.
 
 ## Additional Surface Reconstruction Algorithms
-- **Marching Cubes**: Extracts surfaces from volumetric data, ideal for smooth and detailed surfaces.
-- **Ball-Pivoting Algorithm (BPA)**: Produces high-quality meshes for dense and uniformly sampled point clouds.
-- **Alpha Shapes**: Captures concave shapes and provides control over detail through the `alpha` parameter.
-- **Screened Poisson Reconstruction**: An improved version of Poisson reconstruction that better preserves sharp features.
-- **RBF (Radial Basis Function) Interpolation**: Handles scattered and sparse data to produce smooth surfaces.
-- **Voronoi-Based Reconstruction**: Constructs surfaces using Voronoi diagrams, suitable for irregularly sampled data. This method computes the Voronoi diagram of the input point cloud and uses valid triangular ridges to form a mesh. It is particularly effective for irregularly distributed points.
-- **MLS (Moving Least Squares)**: Fits smooth surfaces to noisy data with adjustable detail.
+- **Marching Cubes**: Extracts surfaces from volumetric data, ideal for smooth and detailed surfaces. **DONE**
+- **Ball-Pivoting Algorithm (BPA)**: Produces high-quality meshes for dense and uniformly sampled point clouds. **DONE**
+- **Alpha Shapes**: Captures concave shapes and provides control over detail through the `alpha` parameter. **DONE**
+- **Screened Poisson Reconstruction**: An improved version of Poisson reconstruction that better preserves sharp features. **TODO: Need CGAL Lib. Open3D doesn't have this algorithm. Not Crucial since regular Poisson seems to work well.**
+- **RBF (Radial Basis Function) Interpolation**: Handles scattered and sparse data to produce smooth surfaces. **DONE**
+- **Voronoi-Based Reconstruction**: Constructs surfaces using Voronoi diagrams, suitable for irregularly sampled data. This method computes the Voronoi diagram of the input point cloud and uses valid triangular ridges to form a mesh. It is particularly effective for irregularly distributed points. **TODO: Not working. Need suitable test data.**
+- **MLS (Moving Least Squares)**: Fits smooth surfaces to noisy data with adjustable detail. **TODO: Not working. Need suitable test data.**
 
 ## AI/ML Features for Surface Reconstruction
 
@@ -34,7 +34,7 @@
 
 To improve the quality of surface reconstruction and reduce artifacts, the following preprocessing and postprocessing methods should be implemented:
 
-### Preprocessing Methods
+## Preprocessing Methods
 1. **Point Cloud Denoising**: Implement algorithms to remove noise and outliers from the point cloud data.
 2. **Point Cloud Smoothing**: Apply smoothing techniques to reduce sharp transitions and irregularities in the point cloud.
 3. **Point Cloud Resampling**: Add functionality to densify or uniformly sample the point cloud for consistent coverage.
