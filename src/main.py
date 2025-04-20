@@ -35,17 +35,18 @@ def get_parser():
         This script performs surface reconstruction from point cloud data using various algorithms.
         It supports preprocessing (denoising, smoothing, resampling) and postprocessing (hole filling,
         mesh simplification, and smoothing). Users can configure parameters via CLI flags or an interactive menu.
-        """
+        """,
+        formatter_class=argparse.RawTextHelpFormatter  # Preserve newlines in help text
     )
     parser.add_argument("--cli-menu", action="store_true",
                         help="Trigger the interactive CLI menu for configuration.")
     parser.add_argument("--input_file_path", type=str, default="./data/example_point_cloud.xyz",
                         help="Path to the input point cloud file.")
     parser.add_argument("--algorithm", type=str, choices=["delaunay", "poisson", "convex_hull", "ball_pivoting", "marching_cubes", "alpha_shapes", "rbf", "voronoi", "mls"], default="poisson",
-                        help="Reconstruction algorithm to use: \n" \
-                        "Recommended default: poisson \n" \
-                        "Other working algorithms: delaunay, convex_hull, ball_pivoting \n" \
-                        "Need further testing: marching_cubes, alpha_shapes, rbf, voronoi, or mls.")
+                        help=("Reconstruction algorithm to use:\n"
+                              "- Recommended default: poisson\n"
+                              "- Other working algorithms: delaunay, convex_hull, ball_pivoting\n"
+                              "- Need further testing: marching_cubes, alpha_shapes, rbf, voronoi, or mls."))
     parser.add_argument("--visu_norms", type=str, default="False",
                         help="Visualize normals (True/False).")
     parser.add_argument("--poisson_depth", type=int, default=12,
